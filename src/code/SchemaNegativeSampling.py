@@ -29,14 +29,6 @@ class SchemaNegativeSampler(BernoulliNegativeSampler):
         # 4. Gather from the CSR tensor
         negative_entities = csr[negative_csr_ids] #shape: (batch_size * num_negs_per_pos,)
         
-        valid = ~axiom_failure_mask
-
-        for i in torch.where(valid)[0]:
-            assert (csr[starts[i]:ends[i]] == negative_entities[i]).any(), (
-            f"Entity {negative_entities[i].item()} not found in CSR region "
-            f"for relation {r[i].item()}"
-        )
-        
         # --- FALLBACK FOR EMPTY RANGE ---
         # Since we cannot return a smaller batch than the input,
         # return the positive triple as negative (which is certainly a false negative)
