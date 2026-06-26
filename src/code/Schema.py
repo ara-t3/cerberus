@@ -1,6 +1,9 @@
+import pickle
 import owlready2
 from pykeen import triples
 from pyparsing import common
+from rdflib import RDF, Graph
+from rdflib import RDF
 from setuptools import dist
 import torch
 from tqdm import tqdm
@@ -15,47 +18,57 @@ import pandas as pd
 import numpy as np
 
 
+
 class SchemaTranslator:
-    def __init__(self, ontology_path, triples):
+    def __init__(self, t_box, a_box, triples):
         
-        ontology=owlready2.get_ontology(ontology_path).load()
+        t_box=owlready2.get_ontology(t_box).load()
         
         triples=triples
         
-        class_instances=self.class_to_entity(ontology)
+        class_instances=self.class_to_entity(a_box)
         
-        relation_ranges=self.relation_to_scope(ontology, triples, extract="range")
+        #class_instances=pickle.load(open("class_instances.pkl", "rb"))
         
-        relation_domains=self.relation_to_scope(ontology, triples, extract="domain")
+        relation_ranges=self.relation_to_scope(t_box, triples, extract="range")
+        
+        relation_domains=self.relation_to_scope(t_box, triples, extract="domain")
         
         self.csr_list_r, self.offsets_r=self.CSR_offset_precomputing(
-            ontology,
+            t_box,
             triples,
             class_instances,
             extract="range")
         
         self.csr_list_d, self.offsets_d=self.CSR_offset_precomputing(
-            ontology,
+            t_box,
             triples,
             class_instances,
             extract="domain")
         
         self.hr_scores, self.rt_scores=self.compute_false_negative_likelyhood(triples)
         
-        self.similarity_matrix_r, self.empty_mask_r=self.build_similarity_matrix(ontology, relation_ranges)
+        self.similarity_matrix_r, self.empty_mask_r=self.build_similarity_matrix(t_box, relation_ranges)
         
-        self.similarity_matrix_d, self.empty_mask_d=self.build_similarity_matrix(ontology, relation_domains)
+        self.similarity_matrix_d, self.empty_mask_d=self.build_similarity_matrix(t_box, relation_domains)
         
-        self.disjoint_with_matrix_r, self.empty_mask_disjoint_r=self.build_disjoint_with_matrix(ontology, relation_ranges)
+        self.disjoint_with_matrix_r, self.empty_mask_disjoint_r=self.build_disjoint_with_matrix(t_box, relation_ranges)
         
-        self.disjoint_with_matrix_d, self.empty_mask_disjoint_d=self.build_disjoint_with_matrix(ontology, relation_domains)
+        self.disjoint_with_matrix_d, self.empty_mask_disjoint_d=self.build_disjoint_with_matrix(t_box, relation_domains)
         return
     
-    def class_to_entity(self, ontology):
-        class_instances = {}
-        for cls in tqdm(ontology.classes(), desc="Precomputing class instances"):
-            instances = list(cls.instances())
-            class_instances[cls] = instances
+    def class_to_entity(self, abox):
+        g = Graph()
+        print('parsing abox')
+        g.parse(abox, format="xml")
+        
+        
+
+        class_instances = defaultdict(list)
+
+        for subj, _, cls in tqdm(g.triples((None, RDF.type, None)), desc="Precomputing class instances"):
+            class_instances[str(cls)].append(str(subj))
+
         return class_instances
 
 
@@ -68,47 +81,49 @@ class SchemaTranslator:
                 classes.append(r)
         return classes
 
-    def relation_to_scope(self, ontology, triples, extract: Literal["range", "domain"]):
+    def relation_to_scope(self, t_box, triples, extract: Literal["range", "domain"]):
         relation_scope = {}
-        for prop in tqdm(ontology.object_properties(), desc="Precomputing relation scopes"):
-            rel_id=triples.relation_to_id.get(prop.iri)
-            if extract == "range":
-                classes = [r.name for r in self.unpack_unionof(prop.range) if hasattr(r, 'name')]
-            else:
-                classes = [r.name for r in self.unpack_unionof(prop.domain) if hasattr(r, 'name')]
-            if classes:
+        for rel_id in tqdm(range(triples.num_relations), desc="Precomputing relation scopes"):
+            rel_label = triples.relation_id_to_label[rel_id]
+            prop = t_box.search_one(iri=f'*{rel_label}')
+            if prop:
+                if extract == "range":
+                    classes = [r.name for r in self.unpack_unionof(prop.range) if hasattr(r, 'name')]
+                else:
+                    classes = [r.name for r in self.unpack_unionof(prop.domain) if hasattr(r, 'name')]
+                
                 relation_scope[rel_id] = classes
             else:
                 relation_scope[rel_id] = []
-        # we remove any 'None' keys
-        relation_scope = {k: v for k, v in relation_scope.items() if k is not None}
-        # handle cases where r is a simple range or a union of classes
         return relation_scope
         
 
-    def CSR_offset_precomputing(self, ontology, triples, class_instances, extract: Literal["range", "domain"]):
+    def CSR_offset_precomputing(self, t_box, triples, class_instances, extract: Literal["range", "domain"]):
         csr_list = []
         offsets=[0]
         current_offset = 0
         for prop_id in tqdm(range(triples.num_relations), desc=f"Precomputing CSR and offsets for {extract}"):
         # get property range
-            prop=ontology.search_one(iri=triples.relation_id_to_label[prop_id])
+            prop=t_box.search_one(iri=f'*{triples.relation_id_to_label[prop_id]}')
             if extract == "range":
                 scope_ = prop.range
             else:
                 scope_ = prop.domain
         # search for the range in the class_instances dictionary
             scope_instances = []
+            scope_ = self.unpack_unionof(scope_)
             for r in scope_:
-                r_instances = class_instances.get(r, [])
+                r_instances = class_instances.get(r.iri, [])
                 scope_instances.extend(r_instances)
             scope_instances = list(set(scope_instances))  # remove duplicates
         #append the result in csr_list and the offset in offsets
-            csr_list.extend(scope_instances)
-            current_offset += len(scope_instances)
+            valid_ids = [triples.entity_to_id[e] for e in scope_instances if e in triples.entity_to_id]
+            csr_list.extend(valid_ids)
+            current_offset += len(valid_ids)
             offsets.append(current_offset)
+            # convert to IDs, use -1 for missing entities
         
-        return csr_list, offsets
+        return torch.tensor(csr_list), torch.tensor(offsets)
     
 
     def compute_false_negative_likelyhood(self, triples):
@@ -154,19 +169,19 @@ class SchemaTranslator:
 
         return hr_scores, rt_scores
     
-    def build_graph(self, ontology) -> nx.DiGraph:
-        """Builds the DAG from the ontology's subClassOf hierarchy."""
+    def build_graph(self, t_box) -> nx.DiGraph:
+        """Builds the DAG from the t_box's subClassOf hierarchy."""
         G = nx.DiGraph()
         root = owlready2.owl.Thing.name
  
-        for cls in ontology.classes():
+        for cls in t_box.classes():
             for parent in cls.is_a:
             # Filter Restrictions and other OWL non-class constructs
                 if isinstance(parent, type) and issubclass(parent, owlready2.owl.Thing):
                     G.add_edge(parent.name, cls.name)
  
     # Attach classes without explicit parent to owl:Thing
-        for cls in ontology.classes():
+        for cls in t_box.classes():
             if cls.name not in G.nodes:
                 G.add_edge(root, cls.name)
             elif G.in_degree(cls.name) == 0 and cls.name != root:
@@ -176,8 +191,8 @@ class SchemaTranslator:
  
     def compute_ic(self, G: nx.DiGraph) -> dict:
         """
-        Calcola l'IC strutturale di Seco per ogni nodo del DAG.
-        IC(c) = 1 - log(|discendenti(c)| + 1) / log(N)
+        Computes the structural IC of Seco for each node in the DAG.
+        IC(c) = 1 - log(|descendants(c)| + 1) / log(N)
         """
         N = G.number_of_nodes()
         ic = {}
@@ -189,8 +204,8 @@ class SchemaTranslator:
  
     def get_lca(self, G: nx.DiGraph, ic: dict, c1: str, c2: str):
         """
-        Trova l'antenato comune con IC massimo (il più specifico).
-        Restituisce None se non esiste un antenato comune.
+        Finds the least common ancestor with the highest IC (the most specific).
+        Returns None if no common ancestor exists.
         """
         anc1 = nx.ancestors(G, c1) | {c1}
         anc2 = nx.ancestors(G, c2) | {c2}
@@ -202,15 +217,15 @@ class SchemaTranslator:
  
     def jiang_conrath_sim(self, ic: dict, G: nx.DiGraph, c1: str, c2: str) -> float:
         """
-        Similarità Jiang & Conrath normalizzata in [0, 1].
- 
+        Computes the Jiang & Conrath similarity normalized in [0, 1].
+
         dist(c1, c2) = IC(c1) + IC(c2) - 2 * IC(LCA)
         sim(c1, c2)  = 1 - dist / 2
- 
-        Casi limite:
-        - Stessa classe        → 0.0
-        - Classe non nel grafo → 0.0
-        - Nessun LCA comune    → 0.0
+
+        Limit cases:
+        - Same class        → 1.0
+        - Class not in graph → 0.0
+        - No common LCA    → 0.0
         """
         if c1 not in ic or c2 not in ic:
             return 0.0
@@ -223,13 +238,13 @@ class SchemaTranslator:
         return 1.0 - (dist / 2.0)
  
  
-    def build_similarity_matrix(self, ontology, relation_scope: dict) -> torch.Tensor:
+    def build_similarity_matrix(self, t_box, relation_scope: dict) -> torch.Tensor:
         """
         Builds the r x r matrix of taxonomic similarity between the classes
-        appearing in the ranges of relations.
+        appearing in the scope of relations.
 
         Args:
-            ontology:         OWLready2 ontology object
+            t_box:         TBox object
             relation_ranges:  dict {relation_id: class_name} mapping
                               each relation to its range class(es)
 
@@ -237,7 +252,7 @@ class SchemaTranslator:
             Tensor (r x r) with sim[i, j] = taxonomic similarity between
             the range of relation i and the range of relation j.
         """
-        G = self.build_graph(ontology)
+        G = self.build_graph(t_box)
         ic = self.compute_ic(G)
     
         r = len(relation_scope)
@@ -251,21 +266,20 @@ class SchemaTranslator:
                     for cj in classes_j
                 ]
                 matrix[i, j] = sum(scores) / (len(scores) + 1e-6)
-                
+        matrix.fill_diagonal_(0) # Set diagonal to 0 to avoid considering self-similarity       
         empty_mask = matrix.sum(dim=1) == 0  # If the row is all 0, the relation has no taxonomic similarity with any other relation
-        matrix.fill_diagonal_(0)  # Set diagonal to 0 to avoid considering self-similarity
         matrix[empty_mask] = 1/r  # Set the row to 1/r to simulate random sampling when there is no taxonomic similarity
         
         return matrix, empty_mask
     
-    def build_disjoint_with_matrix(self, ontology, relation_scope: dict) -> torch.Tensor:
-        """Costruisce la matrice r x r di disjointness tra le classi,
-        restituendo 1 se le classi di range di due relazioni sono disjoint e 0 altrimenti.
-        se il range è multiplo, restituiamo 0, in quanto non possiamo affermare che tutte le classi siano disjoint con quelle dell'altra relazione.
+    def build_disjoint_with_matrix(self, t_box, relation_scope: dict) -> torch.Tensor:
+        """Builds an r x r matrix of disjointness between the classes,
+        returning 1 if the classes of two relations are disjoint and 0 otherwise.
+        If the range is multiple, we return 0, as we cannot assert that all classes are disjoint with those of the other relation.
         """
         
         r=len(relation_scope)
-        matrix = torch.full((r, r), 0)# i create a matrix of number sufficiently small
+        matrix = torch.full((r, r), 0.0)# i create a matrix of number sufficiently small
 
         #we precompute the dijointness, so that there are less calls to the ontology
         
@@ -275,7 +289,7 @@ class SchemaTranslator:
                     classes[0] in [None, "None", "Thing", "owl:Thing"]): #there are multiscope properties, not yet supported, we leave this challenge to future brave researchers
                 lookup[i] = (None, set())
             else:
-                cls = ontology.search_one(iri=f'*{classes[0]}')
+                cls = t_box.search_one(iri=f'*{classes[0]}')
                 disjoints=list(cls.disjoints())[0].entities if len(list(cls.disjoints()))>0 else []
                 lookup[i] = (cls, set(disjoints))
                 
@@ -286,7 +300,7 @@ class SchemaTranslator:
                 else:
                     matrix[i, j] = 1.0 if cls_j in disjoint_i else 0
 
-        empty_mask = matrix.sum(dim=1) == 0  # if the row is all 0, it means that the relation has no disjointness with any other relation
+        empty_mask = matrix.sum(dim=1) == 0  # if the row is all 0, it means that the relation scope has no disjointness with any other relation scope
         matrix[empty_mask] = 1/r  # we set the row to 1/r, to simulate random sampling, as there is no disjointness with any other relation
         return matrix, empty_mask
 
