@@ -5,7 +5,10 @@ from src.code.Schema import SchemaTranslator
 
 
 class SchemaNegativeSampler(BernoulliNegativeSampler):
-    def __init__(self, triples, num_negs_per_pos: int = 1, t_box=None, a_box=None, **kwargs):
+    def __init__(self, num_negs_per_pos: int = 1, t_box=None, a_box=None, **kwargs):
+        
+        triples = kwargs.get('triples_factory')
+        
         super().__init__(mapped_triples=triples.mapped_triples, num_negs_per_pos=num_negs_per_pos, **kwargs)
         self.schema_extractor = SchemaTranslator(t_box=t_box, a_box=a_box, triples=triples)
 
