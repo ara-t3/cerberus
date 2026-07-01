@@ -5,8 +5,12 @@ from src.code.Schema import SchemaTranslator
 
 
 class SchemaNegativeSampler(BernoulliNegativeSampler):
-    def __init__(self, triples, num_negs_per_pos: int = 1, t_box=None, a_box=None, **kwargs):
-        super().__init__(mapped_triples=triples.mapped_triples, num_negs_per_pos=num_negs_per_pos, **kwargs)
+    def __init__(self, num_negs_per_pos: int = 1, t_box=None, a_box=None, **kwargs):
+        
+        triples = kwargs.pop('triples_factory') or self
+        mapped_triples = kwargs.pop('mapped_triples')
+        
+        super().__init__(mapped_triples=mapped_triples, num_negs_per_pos=num_negs_per_pos, **kwargs)
         self.schema_extractor = SchemaTranslator(t_box=t_box, a_box=a_box, triples=triples)
 
     def __extract_negatives(self, batch_size, r, empty_mask, num_negs_per_pos, csr, offsets, true_entities, device):
@@ -198,19 +202,11 @@ class SchemaNegativeSampler(BernoulliNegativeSampler):
         negative_batch_h = torch.cat([negative_batch_0_h, negative_batch_1_h, negative_batch_3_h], dim=1)
         negative_batch_t = torch.cat([negative_batch_0_t, negative_batch_1_t, negative_batch_3_t], dim=1)
         empty_mask_h = torch.cat([empty_mask_0_h, empty_mask_1_h, empty_mask_3_h], dim=1)
-        empty_mask_t = torch.cat([empty_mask_0_t, empty_mask_1_t, empty_mask_3_t], dim=1) 
-        
-        print('negative_batch_h shape:', negative_batch_h.shape)
-        print('negative_batch_t shape:', negative_batch_t.shape)
-        print('empty_mask_h shape:', empty_mask_h.shape)
-        print('empty_mask_t shape:', empty_mask_t.shape)
+        empty_mask_t = torch.cat([empty_mask_0_t, empty_mask_1_t, empty_mask_3_t], dim=1)
         
         #now i obtain only a single combined negative batch and a single combined empty mask, by selecting the negatives based on the head mask
         negative_batch = torch.where(head_mask[:, None, None], negative_batch_h, negative_batch_t)
         empty_mask = torch.where(head_mask[:, None], empty_mask_h, empty_mask_t)
-        
-        print('negative_batch shape:', negative_batch.shape)
-        print('empty_mask shape:', empty_mask.shape)
         
         weights = (~empty_mask).float()
         
@@ -223,10 +219,7 @@ class SchemaNegativeSampler(BernoulliNegativeSampler):
                 replacement=False,
         )
         
-        print('sampled_ids shape:', sampled_ids.shape)
-        
         sample_ids = sampled_ids.unsqueeze(-1).expand(-1, -1, 3)
         negative_batch = torch.gather(negative_batch, dim=1, index=sample_ids)
-        print('FINAL NEGATIVE BATCH:', negative_batch.shape)
         
         return negative_batch
