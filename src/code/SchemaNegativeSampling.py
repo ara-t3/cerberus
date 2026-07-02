@@ -43,8 +43,7 @@ class SchemaNegativeSampler(BernoulliNegativeSampler):
         negative_entities = negative_entities.view(batch_size, num_negs_per_pos) #shape: (batch_size, num_negs_per_pos)
         axiom_failure_mask = axiom_failure_mask.view(batch_size, num_negs_per_pos)
         
-        
-        #CONTROLLO PROVVISORIO, LE ENTITA SONO PESCATE DAI PUNTI GIUSTI DEL CSR?
+
         
         return negative_entities, axiom_failure_mask
 
@@ -121,6 +120,8 @@ class SchemaNegativeSampler(BernoulliNegativeSampler):
         batch_size = positive_batch.shape[0]
         # Get the device of the input batch
         device = positive_batch.device
+        
+        print(device)
 
         # Get the number of negatives per positive triple
         num_negs_per_pos = self.num_negs_per_pos
