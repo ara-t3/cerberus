@@ -28,8 +28,6 @@ class SchemaTranslator:
         
         class_instances=self.class_to_entity(a_box)
         
-        #class_instances=pickle.load(open("class_instances.pkl", "rb"))
-        
         relation_ranges=self.relation_to_scope(t_box, triples, extract="range")
         
         relation_domains=self.relation_to_scope(t_box, triples, extract="domain")
@@ -103,13 +101,13 @@ class SchemaTranslator:
         offsets=[0]
         current_offset = 0
         for prop_id in tqdm(range(triples.num_relations), desc=f"Precomputing CSR and offsets for {extract}"):
-        # get property range
+        # get property scope (range or domain) from the ontology
             prop=t_box.search_one(iri=f'*{triples.relation_id_to_label[prop_id]}')
             if extract == "range":
                 scope_ = prop.range
             else:
                 scope_ = prop.domain
-        # search for the range in the class_instances dictionary
+        # search for the scope in the class_instances dictionary
             scope_instances = []
             scope_ = self.unpack_unionof(scope_)
             for r in scope_:
@@ -121,7 +119,6 @@ class SchemaTranslator:
             csr_list.extend(valid_ids)
             current_offset += len(valid_ids)
             offsets.append(current_offset)
-            # convert to IDs, use -1 for missing entities
         
         return torch.tensor(csr_list), torch.tensor(offsets)
     
@@ -159,9 +156,9 @@ class SchemaTranslator:
 
         # 5. Compute the likelihood score (0 to 1), vectorized over the whole column
         # log(count(h,r)+1) / log(MAX_h'(h',r)+1)*lambda(r) where lambda(r) = 1/(1 + std/median)
-        hr_counts['score'] = (np.log1p(hr_counts['count']) / np.log1p(hr_counts['max']))*(1/1+(hr_counts['std']/(hr_counts['median']+1e-6)))  # Adding a small epsilon to avoid division by zero
+        hr_counts['score'] = (np.log1p(hr_counts['count']) / np.log1p(hr_counts['max']))*(1/(1+(hr_counts['std']/(hr_counts['median']+1e-6))))  # Adding a small epsilon to avoid division by zero
         # log(count(r,t)+1) / log(MAX_t'(r,t')+1)*lambda(r) where lambda(r) = 1/(1 + std/median)
-        rt_counts['score'] = (np.log1p(rt_counts['count']) / np.log1p(rt_counts['max']))*(1/1+(rt_counts['std']/(rt_counts['median']+1e-6)))  # Adding a small epsilon to avoid division by zero
+        rt_counts['score'] = (np.log1p(rt_counts['count']) / np.log1p(rt_counts['max']))*(1/(1+(rt_counts['std']/(rt_counts['median']+1e-6))))  # Adding a small epsilon to avoid division by zero
 
         # 6. Rebuild the final dictionaries: {(h, r): score} and {(r, t): score}
         hr_scores = dict(zip(zip(hr_counts['h'], hr_counts['r']), hr_counts['score']))
@@ -303,9 +300,3 @@ class SchemaTranslator:
         empty_mask = matrix.sum(dim=1) == 0  # if the row is all 0, it means that the relation scope has no disjointness with any other relation scope
         matrix[empty_mask] = 1/r  # we set the row to 1/r, to simulate random sampling, as there is no disjointness with any other relation
         return matrix, empty_mask
-
-        '''
-        TODO:
-        - MODEL THE NON-RANGE CASE ALSO IN THE OFFSETS AND CSR, SO AS TO HAVE A UNIFORM REPRESENTATION FOR ALL
-        RELATIONS
-        '''
