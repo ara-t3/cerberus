@@ -19,7 +19,7 @@ import json
 import argparse
 import os
 from pathlib import Path
-from code.FNWeighter import SchemaLossWeighter
+from src.code.FNWeighter import SchemaLossWeighter
 from src.code.SchemaNegativeSampling import SchemaNegativeSampler
 
 parser = argparse.ArgumentParser()
