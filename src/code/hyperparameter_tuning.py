@@ -19,7 +19,7 @@ import json
 import argparse
 import os
 from pathlib import Path
-from src.code.FNWeighter import SchemaLossWeighter
+from src.code.FNWeighter import FNLossWeighter
 from src.code.SchemaNegativeSampling import SchemaNegativeSampler
 
 parser = argparse.ArgumentParser()
@@ -80,7 +80,7 @@ current_config = model_configs[MODEL]
 
 
 if SAMPLER == 'schema':
-        loss_weighter=SchemaLossWeighter()
+        loss_weighter=FNLossWeighter()
         negative_sampler = SchemaNegativeSampler
         negative_sampler_kwargs = dict(
             filtered=True,
