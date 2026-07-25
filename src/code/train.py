@@ -19,14 +19,15 @@ import optuna
 from pathlib import Path
 
 
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--g", required=True)
     parser.add_argument("--model", type=str, default='transe', 
-                        choices=['transe', 'rotate', 'hake']),
+                        choices=['transe', 'rotate', 'complex']),
     parser.add_argument("--sampler", type=str, default='schema',
-                        choices=['bernoulli', 'random', 'pseudotyped', 'schema'],
+                        choices=['bernoulli', 'schema', 'schema_ablation'],
                         help="Negative sampler to use")
     args = parser.parse_args()
     
@@ -65,8 +66,8 @@ if __name__ == "__main__":
                                    storage=f"sqlite:///optuna_checkpoints/{args.g}/{MODEL}_{SAMPLER}_optuna_study.db")
 
     # Modello
-    EMBEDDING_DIM = best_params.best_params['model.embedding_dim']
-    SCORING_FCT_NORM = best_params.best_params['model.scoring_fct_norm']           # norma L2, standard per TransE
+    EMBEDDING_DIM = 512
+    SCORING_FCT_NORM = 1         # norma L2, standard per TransE
     ENTITY_INITIALIZER = 'xavier_uniform'  # Xavier uniform initialization, standard per Trans
 
     # Loss
@@ -92,18 +93,7 @@ if __name__ == "__main__":
             num_negs_per_pos=NUM_NEGS_PER_POS,
             filtered=True,
         )
-    elif SAMPLER == 'random':
-        negative_sampler = BasicNegativeSampler
-        negative_sampler_kwargs = dict(
-            num_negs_per_pos=NUM_NEGS_PER_POS,
-            filtered=True,
-        )
-    elif SAMPLER == 'pseudotyped':
-        negative_sampler = PseudoTypedNegativeSampler
-        negative_sampler_kwargs = dict(
-            num_negs_per_pos=NUM_NEGS_PER_POS,
-            filtered=True,
-        )
+    
     elif SAMPLER == 'schema':
         loss_weighter=FNLossWeighter()
         negative_sampler = SchemaNegativeSampler
@@ -115,6 +105,16 @@ if __name__ == "__main__":
             triples_factory=train,
             loss_weighter=loss_weighter
         )
+    elif SAMPLER == 'schema_ablation':
+        negative_sampler = SchemaNegativeSampler
+        negative_sampler_kwargs = dict(
+            num_negs_per_pos=NUM_NEGS_PER_POS,
+            filtered=True,
+            a_box=ABOX_PATH,
+            t_box=TBOX_PATH,
+            triples_factory=train,
+            loss_weighter=None
+        )
     else:
         raise ValueError(f'Unknown sampler: {SAMPLER}')
 
@@ -125,7 +125,7 @@ if __name__ == "__main__":
     # Early stopping
     STOPPER_FREQUENCY = 25
     STOPPER_PATIENCE = 3
-    STOPPER_RELATIVE_DELTA = 0.001
+    STOPPER_RELATIVE_DELTA = 0.002
 
     # Evaluation
     EVAL_BATCH_SIZE = 256
@@ -219,7 +219,7 @@ if __name__ == "__main__":
         ),
 
         # --- Varie ---
-        random_seed=42,
+        random_seed=43,
         device=device,
     )
 
