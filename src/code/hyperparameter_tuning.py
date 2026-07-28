@@ -66,13 +66,13 @@ test = TriplesFactory.from_path(
 model_configs = {
     'transe': {
         'model_kwargs': dict(
-            embedding_dim=512,
+            embedding_dim=128,
             scoring_fct_norm=1, 
         )
     },
     'rotate': {
         'model_kwargs': dict(
-            embedding_dim=512,
+            embedding_dim=128,
         )
     }
 }
@@ -114,14 +114,11 @@ hpo_kwargs = dict(
     study_name=f'{MODEL}_{SAMPLER}_hpo_study',
     load_if_exists=True,
     n_trials=10,
-    training_kwargs=dict(num_epochs=200, batch_size=512),
+    training_kwargs=dict(num_epochs=100, batch_size=5000),
     training=train,
     validation=val,
     testing=test,
     model=MODEL,
-    
-    stopper='early',
-    stopper_kwargs=dict(frequency=25, patience=3, relative_delta=0.002),
 
     optimizer='adam',
     optimizer_kwargs_ranges=dict(lr=dict(type='categorical', choices=[1e-4, 1e-3, 1e-2])),
@@ -149,7 +146,7 @@ hpo_kwargs = dict(
 
     evaluator='RankBasedEvaluator',
     evaluator_kwargs=dict(filtered=True),
-    evaluation_kwargs=dict(batch_size=256),
+    evaluation_kwargs=dict(batch_size=2000),
     pruner = MedianPruner(
         n_startup_trials=5,
         n_warmup_steps=10,
