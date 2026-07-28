@@ -1,3 +1,19 @@
+## Overview Esperimenti 
+
+|Dataset  | Model  |    Sampler     |  HPO  | Training |
+| :------: | :----: | :------------: | :---: | :------: |
+| YAGO4-20 | RotatE |   Bernoulli    |   ✅   |          |
+| YAGO4-20 | RotatE |     Schema     |   🚧    |          |
+| YAGO4-20 | RotatE | Schema-NoScore |       |          |
+| ARCO-20  | RotatE |   Bernoulli    |      |          |
+| ARCO-20  | RotatE |     Schema     |       |          |
+| ARCO-20  | RotatE | Schema-NoScore |       |          |
+|  DB50K   | RotatE |   Bernoulli    |      |          |
+|  DB50K   | RotatE |     Schema     |       |          |
+|  DB50K   | RotatE | Schema-NoScore |       |          |
+
+
+
 ## Avvio del sistema
 
 * **Clona la repository:**
