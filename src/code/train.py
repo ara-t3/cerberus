@@ -67,14 +67,14 @@ if __name__ == "__main__":
 
     # Modello
     EMBEDDING_DIM = 512
-    SCORING_FCT_NORM = 1         # norma L2, standard per TransE
-    ENTITY_INITIALIZER = 'xavier_uniform'  # Xavier uniform initialization, standard per Trans
+    SCORING_FCT_NORM = 1         
+    ENTITY_INITIALIZER = 'xavier_uniform'
 
     # Loss
     MARGIN = best_params.best_params['loss.margin']
 
     # Regularizer
-    REGULARIZER_P = best_params.best_params['regularizer.p']  # norma L2, standard per TransE
+    REGULARIZER_P = best_params.best_params['regularizer.p'] 
     REGULARIZER_WEIGHT = best_params.best_params['regularizer.weight']
 
     # Optimizer

@@ -74,6 +74,11 @@ model_configs = {
         'model_kwargs': dict(
             embedding_dim=128,
         )
+    },
+    'complex': {
+        'model_kwargs': dict(
+            embedding_dim=512,
+        )
     }
 }
 
