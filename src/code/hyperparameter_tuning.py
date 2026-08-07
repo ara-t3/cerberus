@@ -66,13 +66,13 @@ test = TriplesFactory.from_path(
 model_configs = {
     'transe': {
         'model_kwargs': dict(
-            embedding_dim=128,
+            embedding_dim=512,
             scoring_fct_norm=1, 
         )
     },
     'rotate': {
         'model_kwargs': dict(
-            embedding_dim=128,
+            embedding_dim=512,
         )
     },
     'complex': {
@@ -119,19 +119,22 @@ hpo_kwargs = dict(
     study_name=f'{MODEL}_{SAMPLER}_hpo_study',
     load_if_exists=True,
     n_trials=10,
-    training_kwargs=dict(num_epochs=100, batch_size=5000),
+    training_kwargs=dict(num_epochs=200, batch_size=512),
     training=train,
     validation=val,
     testing=test,
     model=MODEL,
+    
+    #stopper='early',
+    #stopper_kwargs=dict(frequency=25, patience=3, relative_delta=0.002),
 
     optimizer='adam',
     optimizer_kwargs_ranges=dict(lr=dict(type='categorical', choices=[1e-4, 1e-3, 1e-2])),
 
     loss='NSSALoss',
     loss_kwargs_ranges=dict(
-        margin=dict(type='categorical', choices=[3, 9, 18]),
-        adversarial_temperature=dict(type=float, low=0.5, high=1.0),
+        margin=dict(type='categorical', choices=[3, 9, 18]), 
+        adversarial_temperature=dict(type=float, low=0.5, high=1.0), #.
     ),
 
     training_loop='slcwa',
