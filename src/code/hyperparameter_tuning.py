@@ -125,16 +125,16 @@ hpo_kwargs = dict(
     testing=test,
     model=MODEL,
     
-    stopper='early',
-    stopper_kwargs=dict(frequency=25, patience=3, relative_delta=0.002),
+    #stopper='early',
+    #stopper_kwargs=dict(frequency=25, patience=3, relative_delta=0.002),
 
     optimizer='adam',
     optimizer_kwargs_ranges=dict(lr=dict(type='categorical', choices=[1e-4, 1e-3, 1e-2])),
 
     loss='NSSALoss',
     loss_kwargs_ranges=dict(
-        margin=dict(type='categorical', choices=[3, 9, 18]), #.
-        adversarial_temperature=dict(type=float, low=0.5, high=1.0),
+        margin=dict(type='categorical', choices=[3, 9, 18]), 
+        adversarial_temperature=dict(type=float, low=0.5, high=1.0), #.
     ),
 
     training_loop='slcwa',
