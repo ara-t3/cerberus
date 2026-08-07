@@ -66,7 +66,7 @@ if __name__ == "__main__":
                                    storage=f"sqlite:///optuna_checkpoints/{args.g}/{MODEL}_{SAMPLER}_optuna_study.db")
 
     # Modello
-    EMBEDDING_DIM = 512
+    EMBEDDING_DIM = 256
     SCORING_FCT_NORM = 1         
     ENTITY_INITIALIZER = 'xavier_uniform'
 

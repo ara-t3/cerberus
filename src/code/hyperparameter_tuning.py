@@ -66,18 +66,18 @@ test = TriplesFactory.from_path(
 model_configs = {
     'transe': {
         'model_kwargs': dict(
-            embedding_dim=512,
+            embedding_dim=256,
             scoring_fct_norm=1, 
         )
     },
     'rotate': {
         'model_kwargs': dict(
-            embedding_dim=512,
+            embedding_dim=256,
         )
     },
     'complex': {
         'model_kwargs': dict(
-            embedding_dim=512,
+            embedding_dim=256,
         )
     }
 }
