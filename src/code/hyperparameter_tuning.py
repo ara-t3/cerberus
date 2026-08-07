@@ -133,7 +133,7 @@ hpo_kwargs = dict(
 
     loss='NSSALoss',
     loss_kwargs_ranges=dict(
-        margin=dict(type='categorical', choices=[3, 9, 18]),
+        margin=dict(type='categorical', choices=[3, 9, 18]), #.
         adversarial_temperature=dict(type=float, low=0.5, high=1.0),
     ),
 
