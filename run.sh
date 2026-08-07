@@ -1,0 +1,1 @@
+python -m src.code.hyperparameter_tuning --g YAGO4_20_C --model rotate --sampler schema

@@ -154,7 +154,7 @@ hpo_kwargs = dict(
 
     evaluator='RankBasedEvaluator',
     evaluator_kwargs=dict(filtered=True),
-    evaluation_kwargs=dict(batch_size=256),
+    evaluation_kwargs=dict(batch_size=2000),
     pruner = MedianPruner(
         n_startup_trials=5,
         n_warmup_steps=10,

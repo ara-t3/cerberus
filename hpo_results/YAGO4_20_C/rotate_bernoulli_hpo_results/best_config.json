@@ -1,0 +1,8 @@
+{
+    "loss.margin": 18,
+    "loss.adversarial_temperature": 0.9003650461142496,
+    "regularizer.weight": 0.0001,
+    "regularizer.p": 2,
+    "optimizer.lr": 0.01,
+    "negative_sampler.num_negs_per_pos": 40
+}
