@@ -60,9 +60,11 @@ To enable it, instantiate 'SchemaLossWeighter()' upstream and pass it both in
     def __corrupt_triple_inside_scope(self, positive_batch, num_negs_per_pos, csr, offsets, scores, empty_mask, corruption: Literal["head", "tail"] = "tail"):
         batch_size = positive_batch.shape[0]
         
-        batch_keys = zip(positive_batch[:, 0].tolist(), positive_batch[:, 1].tolist()) if corruption == "tail" else zip(positive_batch[:, 1].tolist(), positive_batch[:, 2].tolist())
-        
-        batch_scores = torch.tensor(list(map(lambda k: scores.get(k, 1.0), batch_keys)), dtype=torch.float32, device=positive_batch.device)
+        if corruption == "tail":
+            idx0, idx1 = positive_batch[:, 0], positive_batch[:, 1]  # (h, r)
+        else:
+            idx0, idx1 = positive_batch[:, 1], positive_batch[:, 2]  # (r, t)
+        batch_scores = scores[idx0, idx1]
         
         batch_scores=batch_scores.unsqueeze(1).expand(-1, num_negs_per_pos).view(batch_size, num_negs_per_pos) #shape: (batch_size, num_negs_per_pos)
         
