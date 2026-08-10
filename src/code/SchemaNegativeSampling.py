@@ -140,18 +140,21 @@ To enable it, instantiate 'SchemaLossWeighter()' upstream and pass it both in
         
         batch_size = positive_batch.shape[0]
         # Get the device of the input batch
-        device = positive_batch.device
-        
+        cpu_device = positive_batch.device # pykeen dataloader always uses cpu
+        cuda_device = self.schema_extractor.csr_list_d.device # Prende CUDA in automatico
         
 
         # Get the number of negatives per positive triple
         num_negs_per_pos = self.num_negs_per_pos
 
-        head_corruption_probability = self.corrupt_head_probability[positive_batch[..., 1]]
+        head_corruption_probability = self.corrupt_head_probability[positive_batch[..., 1]].to(cuda_device)
         head_mask = torch.rand(
-            *positive_batch.shape[:-1], device=positive_batch.device
-        ) < head_corruption_probability.to(device=positive_batch.device)
+            *positive_batch.shape[:-1], device=cuda_device
+        ) < head_corruption_probability.to(device=cuda_device)
         
+        positive_batch = positive_batch.to(cuda_device)
+
+
         #corrupt head triples
         negative_batch_0_h, empty_mask_0_h, batch_scores_0_h = self.__corrupt_triple_inside_scope(
             positive_batch,
@@ -162,7 +165,7 @@ To enable it, instantiate 'SchemaLossWeighter()' upstream and pass it both in
             empty_mask = torch.zeros(
                 batch_size * num_negs_per_pos,
                 dtype=torch.bool,
-                device=device
+                device=cuda_device
             ), #a mask with all false, since we dont need the mask for abscence of disjointness, as we are inside the scope
             corruption="head"
         )
@@ -176,7 +179,7 @@ To enable it, instantiate 'SchemaLossWeighter()' upstream and pass it both in
             empty_mask = torch.zeros(
                 batch_size * num_negs_per_pos,
                 dtype=torch.bool,
-                device=device), #a mask with all false, since we dont need the mask for abscence of disjointness, as we are inside the scope
+                device=cuda_device), #a mask with all false, since we dont need the mask for abscence of disjointness, as we are inside the scope
             corruption="tail"
         )
         
@@ -249,7 +252,8 @@ To enable it, instantiate 'SchemaLossWeighter()' upstream and pass it both in
         sample_ids = sampled_ids.unsqueeze(-1).expand(-1, -1, 3)
         negative_batch = torch.gather(negative_batch, dim=1, index=sample_ids)
         batch_scores = torch.gather(batch_scores, dim=1, index=sampled_ids)
+
         if self.loss_weighter is not None:
-            self.loss_weighter.batch_scores = batch_scores
-        
-        return negative_batch
+            self.loss_weighter.batch_scores = batch_scores.to(cpu_device)
+
+        return negative_batch.to(cpu_device)
