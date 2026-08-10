@@ -24,6 +24,8 @@ class SchemaTranslator:
         
         t_box=owlready2.get_ontology(t_box).load()
         
+        device=torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        
         triples=triples
         
         class_instances=self.class_to_entity(a_box)
@@ -53,6 +55,24 @@ class SchemaTranslator:
         self.disjoint_with_matrix_r, self.empty_mask_disjoint_r=self.build_disjoint_with_matrix(t_box, relation_ranges)
         
         self.disjoint_with_matrix_d, self.empty_mask_disjoint_d=self.build_disjoint_with_matrix(t_box, relation_domains)
+        
+        self.csr_list_d=self.csr_list_d.to(device)
+        self.offsets_d=self.offsets_d.to(device)
+        self.csr_list_r=self.csr_list_r.to(device)
+        self.offsets_r=self.offsets_r.to(device)
+        
+        self.hr_scores=self.hr_scores.to(device)
+        self.rt_scores=self.rt_scores.to(device)
+        
+        self.similarity_matrix_r=self.similarity_matrix_r.to(device)
+        self.similarity_matrix_d=self.similarity_matrix_d.to(device)
+        self.disjoint_with_matrix_r=self.disjoint_with_matrix_r.to(device)
+        self.disjoint_with_matrix_d=self.disjoint_with_matrix_d.to(device)
+        
+        self.empty_mask_d=self.empty_mask_d.to(device)
+        self.empty_mask_r=self.empty_mask_r.to(device)
+        self.empty_mask_disjoint_d=self.empty_mask_disjoint_d.to(device)
+        self.empty_mask_disjoint_r=self.empty_mask_disjoint_r.to(device)
         return
     
     def class_to_entity(self, abox):
@@ -160,11 +180,26 @@ class SchemaTranslator:
         # log(count(r,t)+1) / log(MAX_t'(r,t')+1)*lambda(r) where lambda(r) = 1/(1 + std/median)
         rt_counts['score'] = (np.log1p(rt_counts['count']) / np.log1p(rt_counts['max']))*(1/(1+(rt_counts['std']/(rt_counts['median']+1e-6))))  # Adding a small epsilon to avoid division by zero
 
-        # 6. Rebuild the final dictionaries: {(h, r): score} and {(r, t): score}
-        hr_scores = dict(zip(zip(hr_counts['h'], hr_counts['r']), hr_counts['score']))
-        rt_scores = dict(zip(zip(rt_counts['r'], rt_counts['t']), rt_counts['score']))
 
-        return hr_scores, rt_scores
+        num_entities = triples.num_entities
+        num_relations = triples.num_relations
+        
+        hr_score_matrix = torch.ones(num_entities, num_relations, dtype=torch.float32)
+        rt_score_matrix = torch.ones(num_relations, num_entities, dtype=torch.float32)
+
+
+        # 6. Build the sparse matrices: {(h, r): score} and {(r, t): score}
+        hr_score_matrix[
+        torch.tensor(hr_counts['h'].values, dtype=torch.long),
+        torch.tensor(hr_counts['r'].values, dtype=torch.long)
+        ] = torch.tensor(hr_counts['score'].values, dtype=torch.float32)
+
+        rt_score_matrix[
+        torch.tensor(rt_counts['r'].values, dtype=torch.long),
+        torch.tensor(rt_counts['t'].values, dtype=torch.long)
+        ] = torch.tensor(rt_counts['score'].values, dtype=torch.float32)
+
+        return hr_score_matrix, rt_score_matrix
     
     def build_graph(self, t_box) -> nx.DiGraph:
         """Builds the DAG from the t_box's subClassOf hierarchy."""
