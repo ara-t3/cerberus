@@ -23,6 +23,8 @@ from src.code.FNWeighter import FNLossWeighter
 from src.code.SchemaNegativeSampling import SchemaNegativeSampler
 from pykeen.sampling import negative_sampler_resolver
 
+torch.set_num_threads(4)
+
 negative_sampler_resolver.register(SchemaNegativeSampler, ["schema_sampler"])
 
 parser = argparse.ArgumentParser()
@@ -119,7 +121,7 @@ hpo_kwargs = dict(
     study_name=f'{MODEL}_{SAMPLER}_hpo_study',
     load_if_exists=True,
     n_trials=10,
-    training_kwargs=dict(num_epochs=200, batch_size=512),
+    training_kwargs=dict(num_epochs=200, batch_size=16000),
     training=train,
     validation=val,
     testing=test,
